@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <t t-name="pos_rnc_report.ClosePosPopup" t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension">
+        <xpath expr="//t[@t-set-slot='footer']/div/div[2]" position="inside">
+            <button class="button icon btn btn-lg btn-secondary"
+                    t-if="pos.config.report_sale_summary"
+                    t-on-click="printZReport"
+                    title="Descargar un Reporte Z para la Sesión del TPV">
+                    Z-Report
+                    <i class="fa fa-download" role="img"/>
+            </button>
+        </xpath>
+    </t>
+
+</templates>
