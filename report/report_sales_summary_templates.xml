@@ -38,6 +38,50 @@
             </tbody>
           </table>
 
+          <t t-if="d.get('cash_in')">
+            <h4>Entrada de Efectivo</h4>
+            <table class="table table-sm" style="width:100%;">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th class="text-end">Monto</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <t t-foreach="d.get('cash_in') or []" t-as="ci">
+                  <tr>
+                    <td t-esc="ci.get('date')"/>
+                    <td class="text-end" t-esc="ci.get('amount')"/>
+                    <td t-esc="ci.get('reason')"/>
+                  </tr>
+                </t>
+              </tbody>
+            </table>
+          </t>
+
+          <t t-if="d.get('cash_out')">
+            <h4>Salida de Efectivo</h4>
+            <table class="table table-sm" style="width:100%;">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th class="text-end">Monto</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <t t-foreach="d.get('cash_out') or []" t-as="co">
+                  <tr>
+                    <td t-esc="co.get('date')"/>
+                    <td class="text-end" t-esc="co.get('amount')"/>
+                    <td t-esc="co.get('reason')"/>
+                  </tr>
+                </t>
+              </tbody>
+            </table>
+          </t>
+
           <h4>Resumen</h4>
           <ul>
             <li><strong>Reembolso:</strong> <span t-esc="d.get('refund_total')"/></li>

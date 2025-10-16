@@ -17,8 +17,6 @@
         'security/ir.model.access.csv',
         # Views
         'views/pos_config.xml',
-        # Wizard
-        'wizard/report_password_wizard_view.xml',
         # Reports
         'report/report.xml',
         'report/report_sales_summary_templates.xml',
@@ -26,9 +24,7 @@
     "assets": {
         "point_of_sale._assets_pos": [
             "pos_rnc_report/static/src/js/ControlButtons.js",
-            "pos_rnc_report/static/src/js/ClosingPopup.js",
             "pos_rnc_report/static/src/js/PosStore.js",
-            "pos_rnc_report/static/src/xml/ClosePosPopup.xml",
             "pos_rnc_report/static/src/xml/control_buttons.xml",
             "pos_rnc_report/static/src/xml/ReportSalesSummary.xml",
         ]

@@ -10,6 +10,7 @@ _logger = logging.getLogger(__name__)
 
 class PosSession(models.Model):
     _inherit = "pos.session"
+ 
 
     def get_current_date(self):
         if self.env.user and self.env.user.tz:
@@ -43,12 +44,14 @@ class PosSession(models.Model):
             if absl.amount > 0:
                 cash_in_out.setdefault('cash_in', []).append({
                     'amount': absl.amount,
-                    'date': absl.create_date
+                    'date': absl.create_date,
+                    'reason': absl.payment_ref or absl.ref or absl.name
                 })
             else:
                 cash_in_out.setdefault('cash_out', []).append({
                     'amount': absl.amount,
-                    'date': absl.create_date
+                    'date': absl.create_date,
+                    'reason': absl.payment_ref or absl.ref or absl.name
                 })
         return cash_in_out
 
@@ -197,7 +200,6 @@ class PosSession(models.Model):
         return True
 
     def build_sessions_report(self):
-        print("++++++++++")
         vals = {}
         session_state = {
             'new_session': _('Nueva Sesión'),
@@ -239,22 +241,21 @@ class PosSession(models.Model):
             session_report['top_products'] = top_products
             session_report['best_profit_product'] = best_profit_product
             vals[session.id] = session_report
-        print("vals",vals)
         return vals
     
-    def send_z_report_email(self):
+    def send_z_report_email(self, send_now=True, attach_pdf=True, attach_html=True):
         """Envía el Reporte-Z por correo electrónico.
         Retorna un dict con el resultado para evitar cortar el flujo del POS.
         """
         self.ensure_one()
         _logger.info("="*80)
-        _logger.info("INICIO: Envío de Reporte-Z por correo")
-        _logger.info(f"Sesión: {self.name} (ID: {self.id})")
+        _logger.info("INICIO: Envío de Reporte-Z por correo (send_now=%s, attach_pdf=%s, attach_html=%s)" % (send_now, attach_pdf, attach_html))
+        _logger.debug(f"Sesión: {self.name} (ID: {self.id})")
 
         config = self.config_id
-        _logger.info(f"Config ID: {config.id}")
-        _logger.info(f"report_send_email: {config.report_send_email}")
-        _logger.info(f"report_email_recipients: {config.report_email_recipients}")
+        _logger.debug(f"Config ID: {config.id}")
+        _logger.debug(f"report_send_email: {config.report_send_email}")
+        _logger.debug(f"report_email_recipients: {config.report_email_recipients}")
 
         if not config.report_send_email:
             _logger.warning("Envío de correo desactivado en la configuración")
@@ -273,28 +274,29 @@ class PosSession(models.Model):
             return {'ok': False, 'reason': 'no_mail_server', 'message': msg}
 
         # PASO 1: PDF o Fallback HTML
-        _logger.info("→ PASO 1: Generando PDF del reporte")
         pdf_base64 = None
-        try:
+        if attach_pdf:
+            _logger.debug("→ PASO 1: Generando PDF del reporte")
             try:
-                report_action = self.env.ref('pos_rnc_report.action_report_sales_summary')
-            except ValueError:
-                report_action = self.env['ir.actions.report']._get_report_from_name('pos_rnc_report.report_sales_summary')
-            _logger.info(f"  Acción de reporte: {report_action and report_action.name or 'No encontrada'}")
-            if report_action:
-                pdf_content, _ = report_action._render_qweb_pdf([self.id])
-                pdf_size = len(pdf_content)
-                _logger.info(f"  ✓ PDF generado: {pdf_size} bytes")
-                pdf_base64 = base64.b64encode(pdf_content).decode()
-                _logger.info(f"  ✓ PDF codificado en base64")
-            else:
-                _logger.warning("  Definición de reporte no instalada. Se usará Fallback HTML adjunto.")
-        except Exception as e:
-            _logger.error(f"  ERROR al generar PDF: {str(e)}", exc_info=True)
-            _logger.warning("  Falló la generación de PDF. Se usará Fallback HTML adjunto.")
+                try:
+                    report_action = self.env.ref('pos_rnc_report.action_report_sales_summary')
+                except ValueError:
+                    report_action = self.env['ir.actions.report']._get_report_from_name('pos_rnc_report.report_sales_summary')
+                _logger.debug(f"  Acción de reporte: {report_action and report_action.name or 'No encontrada'}")
+                if report_action:
+                    pdf_content, _ = report_action._render_qweb_pdf([self.id])
+                    pdf_size = len(pdf_content)
+                    _logger.debug(f"  ✓ PDF generado: {pdf_size} bytes")
+                    pdf_base64 = base64.b64encode(pdf_content).decode()
+                    _logger.debug(f"  ✓ PDF codificado en base64")
+                else:
+                    _logger.warning("  Definición de reporte no instalada. Se omite PDF.")
+            except Exception as e:
+                _logger.error(f"  ERROR al generar PDF: {str(e)}", exc_info=True)
+                _logger.warning("  Falló la generación de PDF. Se continuará sin PDF.")
 
         # PASO 2: Adjuntos (PDF si existe, si no HTML)
-        _logger.info("→ PASO 2: Creando adjunto(s)")
+        _logger.debug("→ PASO 2: Creando adjunto(s)")
         attachment_ids = []
         try:
             if pdf_base64:
@@ -307,8 +309,8 @@ class PosSession(models.Model):
                     'mimetype': 'application/pdf'
                 })
                 attachment_ids.append(attachment_pdf.id)
-                _logger.info(f"  ✓ Adjunto PDF creado: ID {attachment_pdf.id}")
-            else:
+                _logger.debug(f"  ✓ Adjunto PDF creado: ID {attachment_pdf.id}")
+            elif attach_html:
                 # Construir el mismo HTML detallado que se usa en el cuerpo del correo
                 d_fb = self.build_sessions_report().get(self.id, {})
                 def fmt_fb(v):
@@ -327,11 +329,11 @@ class PosSession(models.Model):
                     for tx in (d_fb.get('taxes') or [])
                 ])
                 cashin_rows_fb = ''.join([
-                    f"<tr><td>{fmt_fb((ci or {}).get('date'))}</td><td style='text-align:right;'>{fmt_fb((ci or {}).get('amount'))}</td></tr>"
+                    f"<tr><td>{fmt_fb((ci or {}).get('date'))}</td><td style='text-align:right;'>{fmt_fb((ci or {}).get('amount'))}</td><td>{(ci or {}).get('reason','')}</td></tr>"
                     for ci in (d_fb.get('cash_in') or [])
                 ])
                 cashout_rows_fb = ''.join([
-                    f"<tr><td>{fmt_fb((co or {}).get('date'))}</td><td style='text-align:right;'>{fmt_fb((co or {}).get('amount'))}</td></tr>"
+                    f"<tr><td>{fmt_fb((co or {}).get('date'))}</td><td style='text-align:right;'>{fmt_fb((co or {}).get('amount'))}</td><td>{(co or {}).get('reason','')}</td></tr>"
                     for co in (d_fb.get('cash_out') or [])
                 ])
                 reversals_html_fb = ''
@@ -384,13 +386,13 @@ class PosSession(models.Model):
                       </table>
                       <h3>Entrada de Efectivo</h3>
                       <table style='width:100%;border-collapse:collapse' border='1'>
-                        <thead><tr><th>Fecha</th><th style='text-align:right;'>Monto</th></tr></thead>
-                        <tbody>{cashin_rows_fb or '<tr><td colspan=2>Sin datos</td></tr>'}</tbody>
+                        <thead><tr><th>Fecha</th><th style='text-align:right;'>Monto</th><th>Motivo</th></tr></thead>
+                        <tbody>{cashin_rows_fb or '<tr><td colspan=3>Sin datos</td></tr>'}</tbody>
                       </table>
                       <h3>Salida de Efectivo</h3>
                       <table style='width:100%;border-collapse:collapse' border='1'>
-                        <thead><tr><th>Fecha</th><th style='text-align:right;'>Monto</th></tr></thead>
-                        <tbody>{cashout_rows_fb or '<tr><td colspan=2>Sin datos</td></tr>'}</tbody>
+                        <thead><tr><th>Fecha</th><th style='text-align:right;'>Monto</th><th>Motivo</th></tr></thead>
+                        <tbody>{cashout_rows_fb or '<tr><td colspan=3>Sin datos</td></tr>'}</tbody>
                       </table>
                       {reversals_html_fb}
                     </div>
@@ -405,17 +407,17 @@ class PosSession(models.Model):
                     'mimetype': 'text/html'
                 })
                 attachment_ids.append(attachment_html.id)
-                _logger.info(f"  ✓ Adjunto HTML creado (fallback): ID {attachment_html.id}")
+                _logger.debug(f"  ✓ Adjunto HTML creado (fallback): ID {attachment_html.id}")
         except Exception as e:
             _logger.error(f"  ERROR al crear adjunto: {str(e)}", exc_info=True)
             return {'ok': False, 'reason': 'attachment_error', 'message': str(e)}
 
         # PASO 3: Correo (asunto y cuerpo detallado)
-        _logger.info("→ PASO 3: Preparando correo")
+        _logger.debug("→ PASO 3: Preparando correo")
         email_to = config.report_email_recipients.replace(' ', '')
         email_from = self.env.company.email or self.user_id.email or self.env['ir.mail_server']._get_default_from_address()
-        _logger.info(f"  Destinatarios: {email_to}")
-        _logger.info(f"  Remitente (email_from): {email_from}")
+        _logger.debug(f"  Destinatarios: {email_to}")
+        _logger.debug(f"  Remitente (email_from): {email_from}")
 
         # Construir HTML con todos los datos de la sesión
         d = self.build_sessions_report().get(self.id, {})
@@ -435,11 +437,11 @@ class PosSession(models.Model):
             for tx in (d.get('taxes') or [])
         ])
         cashin_rows = ''.join([
-            f"<tr><td>{fmt((ci or {}).get('date'))}</td><td style='text-align:right;'>{fmt((ci or {}).get('amount'))}</td></tr>"
+            f"<tr><td>{fmt((ci or {}).get('date'))}</td><td style='text-align:right;'>{fmt((ci or {}).get('amount'))}</td><td>{(ci or {}).get('reason','')}</td></tr>"
             for ci in (d.get('cash_in') or [])
         ])
         cashout_rows = ''.join([
-            f"<tr><td>{fmt((co or {}).get('date'))}</td><td style='text-align:right;'>{fmt((co or {}).get('amount'))}</td></tr>"
+            f"<tr><td>{fmt((co or {}).get('date'))}</td><td style='text-align:right;'>{fmt((co or {}).get('amount'))}</td><td>{(co or {}).get('reason','')}</td></tr>"
             for co in (d.get('cash_out') or [])
         ])
         reversals_html = ''
@@ -493,13 +495,13 @@ class PosSession(models.Model):
               </table>
               <h3>Entrada de Efectivo</h3>
               <table style='width:100%;border-collapse:collapse' border='1'>
-                <thead><tr><th>Fecha</th><th style='text-align:right;'>Monto</th></tr></thead>
-                <tbody>{cashin_rows or '<tr><td colspan=2>Sin datos</td></tr>'}</tbody>
+                <thead><tr><th>Fecha</th><th style='text-align:right;'>Monto</th><th>Motivo</th></tr></thead>
+                <tbody>{cashin_rows or '<tr><td colspan=3>Sin datos</td></tr>'}</tbody>
               </table>
               <h3>Salida de Efectivo</h3>
               <table style='width:100%;border-collapse:collapse' border='1'>
-                <thead><tr><th>Fecha</th><th style='text-align:right;'>Monto</th></tr></thead>
-                <tbody>{cashout_rows or '<tr><td colspan=2>Sin datos</td></tr>'}</tbody>
+                <thead><tr><th>Fecha</th><th style='text-align:right;'>Monto</th><th>Motivo</th></tr></thead>
+                <tbody>{cashout_rows or '<tr><td colspan=3>Sin datos</td></tr>'}</tbody>
               </table>
               {reversals_html}
             </div>
@@ -516,17 +518,22 @@ class PosSession(models.Model):
                 'attachment_ids': [(6, 0, attachment_ids)]
             }
             mail = self.env['mail.mail'].sudo().create(mail_values)
-            _logger.info(f"  ✓ Correo creado: ID {mail.id}")
+            _logger.debug(f"  ✓ Correo creado: ID {mail.id}")
         except Exception as e:
             _logger.error(f"  ERROR al crear correo: {str(e)}", exc_info=True)
             return {'ok': False, 'reason': 'mail_create_error', 'message': str(e)}
 
-        # PASO 4: Envío
+        # PASO 4: Envío o Encolado
+        if not send_now:
+            _logger.debug("→ PASO 4: Encolando correo para envío asíncrono por el cron")
+            _logger.debug("  ✓ Correo creado en cola (mail.mail). No se envía sincrónicamente")
+            _logger.info("FIN: Proceso completado (correo encolado)")
+            _logger.info("="*80)
+            return {'ok': True, 'mail_id': mail.id, 'state': 'outgoing', 'queued': True}
         _logger.info("→ PASO 4: Enviando correo")
         try:
             mail.sudo().send()
             _logger.info("  ✓ Correo enviado exitosamente")
-            # El registro puede eliminarse en flujos con auto_delete o por reglas. Proteger el acceso a state.
             state = 'sent'
             try:
                 existing = mail.exists()
@@ -534,13 +541,11 @@ class PosSession(models.Model):
                     state = existing.state
             except Exception:
                 pass
-            _logger.info(f"  Estado del correo: {state}")
+            _logger.debug(f"  Estado del correo: {state}")
             _logger.info("FIN: Proceso completado exitosamente")
             _logger.info("="*80)
             return {'ok': True, 'mail_id': mail.id, 'state': state}
         except Exception as e:
-            # En algunos entornos, el registro mail.mail puede eliminarse durante send(),
-            # provocando MissingError aunque el correo se haya enviado. Tratarlo como éxito.
             msg = str(e)
             if isinstance(e, MissingError) or 'record does not exist' in msg or 'registro no existe' in msg:
                 _logger.warning("  mail.mail fue eliminado durante el envío; se asume envío exitoso")
@@ -549,3 +554,14 @@ class PosSession(models.Model):
             _logger.error(f"  ERROR al enviar correo: {msg}", exc_info=True)
             _logger.info("="*80)
             return {'ok': False, 'reason': 'send_error', 'message': msg}
+ 
+
+    def action_pos_session_close(self, balancing_account=None, amount_to_balance=0.0, bank_payment_method_diffs=None):
+        res = super().action_pos_session_close(balancing_account, amount_to_balance, bank_payment_method_diffs)
+        for session in self:
+            try:
+                result = session.send_z_report_email(send_now=True, attach_pdf=False, attach_html=True)
+                _logger.debug(f"Resultado del envío de correo al cerrar sesión {session.name}: {result}")
+            except Exception as e:
+                _logger.error(f"Error al enviar correo de cierre para la sesión {session.name}: {e}", exc_info=True)
+        return res

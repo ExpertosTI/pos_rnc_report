@@ -8,60 +8,31 @@ import { renderToElement } from "@web/core/utils/render";
 patch(PosStore.prototype, {
 
     async printZReport() {
-        console.log("================================================================================");
-        console.log("🔵 INICIO: Generación de Reporte-Z desde POS");
-        console.log(`📋 Sesión: ${this.session.name} (ID: ${this.session.id})`);
-        console.log("⚙️ Configuración POS:", {
-            report_sale_summary: this.config.report_sale_summary,
-            report_password: this.config.report_password ? '***configurada***' : 'NO configurada',
-            report_send_email: this.config.report_send_email,
-            report_email_recipients: this.config.report_email_recipients || 'NO configurado'
-        });
-
         // Validación de contraseña
         if (this.config.report_password) {
-            console.log("🔒 Contraseña requerida - Mostrando modal...");
             const password = await this._showPasswordModal();
             if (!password) {
-                console.log(" Usuario canceló la operación");
                 return;
             }
             try {
-                console.log("🔍 Validando contraseña en el backend...");
                 await this.data.call("pos.session", "validate_report_password", [[this.session.id], password]);
-                console.log("✅ Contraseña validada correctamente");
             } catch (error) {
-                console.error(" ERROR: Contraseña incorrecta", error);
                 alert("Error: " + (error.message || "Contraseña incorrecta"));
                 return;
             }
-        } else {
-            console.log("🔓 No se requiere contraseña");
         }
 
         // Generación de datos del reporte
-        console.log("📊 Generando reporte...");
         let results = await this.data.call("pos.session", "build_sessions_report", [[this.session.id]]);
-        console.log("✅ Reporte generado exitosamente");
-        console.log("📦 Datos del reporte:", results[this.session.id]);
 
         // Envío de correo
-        console.log("📧 Verificando configuración de correo electrónico...");
-        console.log("   - report_send_email:", this.config.report_send_email);
-        console.log("   - report_email_recipients:", this.config.report_email_recipients);
         if (this.config.report_send_email) {
-            console.log("✅ Envío de correo ACTIVADO");
             if (!this.config.report_email_recipients) {
-                console.warn("⚠️ ADVERTENCIA: No hay destinatarios configurados");
                 alert("Advertencia: El envío de correo está activado pero no hay destinatarios configurados.");
             } else {
-                console.log(`📬 Destinatarios: ${this.config.report_email_recipients}`);
-                console.log("🚀 Llamando al backend para enviar correo...");
                 try {
                     const emailResult = await this.data.call("pos.session", "send_z_report_email", [[this.session.id]]);
-                    console.log("📨 Resultado:", emailResult);
                     if (emailResult && emailResult.ok) {
-                        console.log("✅ Correo enviado exitosamente");
                     } else {
                         const reason = emailResult && emailResult.reason ? emailResult.reason : 'unknown';
                         const message = (emailResult && emailResult.message ? String(emailResult.message) : '');
@@ -72,30 +43,21 @@ patch(PosStore.prototype, {
                             msgLower.includes('se eliminó')
                         );
                         if (isMissingRecord) {
-                            console.log("✅ Correo enviado (mail.mail eliminado tras envío, tratado como éxito)");
                         } else {
-                            console.warn("⚠️ El backend reportó un problema al enviar el correo", reason, message);
                             alert("Advertencia: El reporte se generó pero hubo un problema al enviar el correo (" + reason + ")\n" + message);
                         }
                     }
                 } catch (error) {
-                    console.error("❌ ERROR al enviar correo:", error);
                     alert("Advertencia: El reporte se generó pero hubo un error al enviar el correo: " + (error.message || 'Error desconocido'));
                 }
             }
-        } else {
-            console.log("⚠️ Envío de correo DESACTIVADO en la configuración");
         }
 
         // Impresión
-        console.log("🖨️ Imprimiendo reporte...");
         const report = renderToElement("pos_rnc_report.ReportSalesSummary", Object.assign({}, {
             pos: this,
             data: results[this.session.id]
         }));
-        console.log("✅ Reporte renderizado");
-        console.log("🔵 FIN: Proceso completado exitosamente");
-        console.log("================================================================================");
         return await this.printer.printHtml(report, {webPrintFallback: true});
     },
 

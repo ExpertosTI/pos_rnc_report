@@ -161,7 +161,12 @@
                 <div class='orderlines'>
                     <t t-foreach="data['cash_in']" t-key="cash" t-as="cash">
                         <div class="receipt-line">
-                            <t t-esc="cash.date"/>
+                            <t t-if="cash.reason">
+                                <t t-esc="cash.date"/> - <t t-esc="cash.reason"/>
+                            </t>
+                            <t t-else="">
+                                <t t-esc="cash.date"/>
+                            </t>
                             <span class="pos-receipt-right-align">
                                 <t t-esc="cash.amount"/>
                             </span>
@@ -176,7 +181,12 @@
                 <div class='orderlines'>
                     <t t-foreach="data['cash_out']" t-key="cash" t-as="cash">
                         <div class="receipt-line">
-                            <t t-esc="cash.date"/>
+                            <t t-if="cash.reason">
+                                <t t-esc="cash.date"/> - <t t-esc="cash.reason"/>
+                            </t>
+                            <t t-else="">
+                                <t t-esc="cash.date"/>
+                            </t>
                             <span class="pos-receipt-right-align">
                                 <t t-esc="cash.amount"/>
                             </span>
