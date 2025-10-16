@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+
+        <record id="view_inherit_pos_config_form" model="ir.ui.view">
+            <field name="name">view.inherit.pos.config.form</field>
+            <field name="model">pos.config</field>
+            <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+            <field name="arch" type="xml">
+
+                <xpath expr="//sheet/div[4]/div" position="before">
+                    <setting id="z_report" string="Detalle del Día" help="Mostrar Detalle del Día con Resumen de Ventas">
+                        <field name="report_sale_summary"/>
+                        <div class="content-group mt-2" invisible="not report_sale_summary">
+                            <div class="row">
+                                <label for="report_password" class="col-lg-3 o_light_label"/>
+                                <field name="report_password" placeholder="Contraseña para acceder al reporte..." 
+                                       password="True" class="col-lg-9"/>
+                            </div>
+                            <div class="row mt-2">
+                                <label for="report_send_email" class="col-lg-3 o_light_label" string="Enviar por Correo"/>
+                                <field name="report_send_email" class="col-lg-9"/>
+                            </div>
+                            <div class="row mt-2" invisible="not report_send_email">
+                                <label for="report_email_recipients" class="col-lg-3 o_light_label"/>
+                                <field name="report_email_recipients" placeholder="correo1@ejemplo.com, correo2@ejemplo.com" 
+                                       class="col-lg-9"/>
+                            </div>
+                        </div>
+                    </setting>
+                </xpath>
+
+            </field>
+        </record>
+
+
+    </data>
+</odoo>

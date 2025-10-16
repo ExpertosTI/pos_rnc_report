@@ -1,0 +1,172 @@
+═══════════════════════════════════════════════════════════════════════════════
+DIAGNÓSTICO RÁPIDO - REPORTE Z CON ENVÍO DE CORREO
+═══════════════════════════════════════════════════════════════════════════════
+
+🔴 PROBLEMA: No se ven logs y no se envía el correo
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 1: LIMPIAR CACHÉ Y ACTUALIZAR ASSETS
+═══════════════════════════════════════════════════════════════════════════════
+
+En el servidor, ejecuta:
+
+    odoo-bin -u pos_rnc_report -d nombre_base_datos --stop-after-init
+
+O desde la interfaz:
+    1. Ve a Aplicaciones
+    2. Busca "Detalle del Día TPV"
+    3. Haz clic en "Actualizar"
+    4. IMPORTANTE: Marca la opción "Actualizar Apps List" si aparece
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 2: LIMPIAR CACHÉ DEL NAVEGADOR
+═══════════════════════════════════════════════════════════════════════════════
+
+Opción A - Recarga forzada:
+    1. Presiona Ctrl + Shift + R (Windows/Linux)
+    2. O Cmd + Shift + R (Mac)
+
+Opción B - Limpiar caché manualmente:
+    1. Presiona F12 para abrir DevTools
+    2. Haz clic derecho en el botón de recargar
+    3. Selecciona "Empty Cache and Hard Reload"
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 3: VERIFICAR CONFIGURACIÓN DEL POS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Ve a: Punto de Venta > Configuración > Puntos de Venta
+2. Edita tu punto de venta
+3. Busca la sección "Detalle del Día"
+4. Verifica que existan estos campos:
+   
+   ✓ Contraseña del Reporte: [campo de texto con password]
+   ✓ Enviar por Correo: [checkbox]
+   ✓ Destinatarios: [campo de texto]
+
+5. Si NO aparecen estos campos:
+   - El módulo NO se actualizó correctamente
+   - Revisa los logs del servidor para ver errores
+   - Asegúrate de que el archivo pos_config.py no tiene errores de sintaxis
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 4: CONFIGURAR EL ENVÍO DE CORREO
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Marca la casilla "Enviar por Correo"
+2. En "Destinatarios" escribe: tu@correo.com
+3. Haz clic en GUARDAR
+4. IMPORTANTE: Cierra y abre una nueva sesión del POS
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 5: VERIFICAR EN LA CONSOLA DEL NAVEGADOR
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Abre el POS
+2. Presiona F12
+3. Ve a la pestaña "Console"
+4. Ejecuta este comando (copia y pega):
+
+// ========== COPIA DESDE AQUÍ ==========
+(function() {
+    try {
+        const pos = odoo.__DEBUG__.services['point_of_sale.pos'];
+        console.log("═══════════════════════════════════════════════════════");
+        console.log("DIAGNÓSTICO DE CONFIGURACIÓN");
+        console.log("═══════════════════════════════════════════════════════");
+        console.log("Sesión:", pos?.session?.name);
+        console.log("Config ID:", pos?.config?.id);
+        console.log("report_send_email:", pos?.config?.report_send_email);
+        console.log("report_email_recipients:", pos?.config?.report_email_recipients);
+        console.log("═══════════════════════════════════════════════════════");
+        
+        if (!pos?.config?.report_send_email) {
+            console.warn("⚠️ PROBLEMA: report_send_email está en FALSE o undefined");
+            console.log("SOLUCIÓN: Ve a Configuración POS y activa 'Enviar por Correo'");
+        }
+        
+        if (!pos?.config?.report_email_recipients) {
+            console.warn("⚠️ PROBLEMA: No hay destinatarios configurados");
+            console.log("SOLUCIÓN: Agrega correos en el campo 'Destinatarios'");
+        }
+        
+        if (pos?.config?.report_send_email && pos?.config?.report_email_recipients) {
+            console.log("✅ Configuración correcta!");
+        }
+    } catch(e) {
+        console.error("ERROR:", e);
+    }
+})();
+// ========== HASTA AQUÍ ==========
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 6: PROBAR EL BOTÓN Z-REPORT
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Con la consola abierta (F12)
+2. Presiona el botón "Z-Report"
+3. Deberías ver logs que empiezan con:
+   🔵 INICIO: Generación de Reporte-Z desde POS
+
+4. Si NO ves logs:
+   - El archivo ControlButtons.js no se cargó
+   - Limpia caché nuevamente (Ctrl + Shift + R)
+   - Verifica que no haya errores de JavaScript en la consola
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 7: VERIFICAR LOGS DEL SERVIDOR
+═══════════════════════════════════════════════════════════════════════════════
+
+En el servidor, revisa el log de Odoo:
+
+    tail -f /var/log/odoo/odoo-server.log
+
+O si ejecutas Odoo desde terminal, verás los logs directamente.
+
+Busca líneas que empiecen con:
+    ================================================================================
+    INICIO: Envío de Reporte-Z por correo
+
+═══════════════════════════════════════════════════════════════════════════════
+PROBLEMAS COMUNES Y SOLUCIONES
+═══════════════════════════════════════════════════════════════════════════════
+
+❌ PROBLEMA: Los campos no aparecen en la configuración del POS
+✅ SOLUCIÓN: 
+   - Verifica que pos_config.py no tenga errores de sintaxis
+   - Actualiza el módulo con: odoo-bin -u pos_rnc_report
+   - Revisa los logs del servidor para ver errores
+
+❌ PROBLEMA: No se ven logs en la consola del navegador
+✅ SOLUCIÓN:
+   - Limpia caché: Ctrl + Shift + R
+   - Cierra y abre nueva sesión del POS
+   - Verifica que no haya errores de JavaScript en la consola
+
+❌ PROBLEMA: Los logs aparecen pero dice "Envío de correo DESACTIVADO"
+✅ SOLUCIÓN:
+   - Ve a Configuración POS
+   - Activa la casilla "Enviar por Correo"
+   - Guarda y cierra/abre sesión del POS
+
+❌ PROBLEMA: El correo no se envía
+✅ SOLUCIÓN:
+   - Configura un servidor SMTP en Odoo
+   - Ve a: Ajustes > Técnico > Correo electrónico > Servidores de correo saliente
+   - Prueba la conexión del servidor SMTP
+
+═══════════════════════════════════════════════════════════════════════════════
+CHECKLIST FINAL
+═══════════════════════════════════════════════════════════════════════════════
+
+□ Módulo actualizado en el servidor
+□ Caché del navegador limpiada (Ctrl + Shift + R)
+□ Campos visibles en Configuración POS
+□ "Enviar por Correo" activado
+□ Destinatarios configurados
+□ Sesión del POS cerrada y reabierta
+□ Consola del navegador abierta (F12)
+□ Logs visibles al presionar "Z-Report"
+□ Servidor SMTP configurado en Odoo
+
+═══════════════════════════════════════════════════════════════════════════════

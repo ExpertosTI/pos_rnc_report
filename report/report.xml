@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <report
+            id="action_report_sales_summary"
+            model="pos.session"
+            string="Reporte Z"
+            report_type="qweb-pdf"
+            name="pos_rnc_report.report_sales_summary"
+            file="pos_rnc_report.report_sales_summary"
+            print_report_name="(object.name or 'Reporte Z') + '.pdf'"
+        />
+    </data>
+</odoo>

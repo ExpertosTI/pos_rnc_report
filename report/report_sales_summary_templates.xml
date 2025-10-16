@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <template id="report_sales_summary">
+    <t t-call="web.external_layout">
+      <div class="page">
+        <t t-foreach="docs" t-as="doc">
+          <t t-set="d" t-value="data or data_map.get(doc.id)"/>
+          <h2>Reporte de Cierre de Sesión - <span t-esc="doc.name"/></h2>
+          <p>
+            <strong>Fecha:</strong> <span t-esc="d.get('current_date')"/>
+            &#160;&#160; <strong>Hora:</strong> <span t-esc="d.get('current_time')"/>
+          </p>
+          <p>
+            <strong>Vendedor:</strong> <span t-esc="d.get('seller')"/>
+            &#160;&#160; <strong>Órdenes:</strong> <span t-esc="d.get('orders_count')"/>
+          </p>
+          <p>
+            <strong>Total Ventas:</strong> <span t-esc="d.get('sales_total')"/>
+            &#160;&#160; <strong>Impuestos:</strong> <span t-esc="d.get('taxes_total')"/>
+            &#160;&#160; <strong>Descuentos:</strong> <span t-esc="d.get('discounts_total')"/>
+          </p>
+
+          <h4>Métodos de Pago</h4>
+          <table class="table table-sm" style="width:100%;">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th class="text-end">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <t t-foreach="d.get('payments_amount') or []" t-as="pm">
+                <tr>
+                  <td t-esc="pm.get('name')"/>
+                  <td class="text-end" t-esc="pm.get('amount')"/>
+                </tr>
+              </t>
+            </tbody>
+          </table>
+
+          <h4>Resumen</h4>
+          <ul>
+            <li><strong>Reembolso:</strong> <span t-esc="d.get('refund_total')"/></li>
+            <li><strong>Ventas Totales:</strong> <span t-esc="d.get('gross_total')"/></li>
+            <li><strong>Ganancias:</strong> <span t-esc="d.get('gross_profit_total')"/></li>
+            <li><strong>Total de Cierre:</strong> <span t-esc="d.get('closing_total')"/></li>
+          </ul>
+          <div style="page-break-after: always;"></div>
+        </t>
+      </div>
+    </t>
+  </template>
+</odoo>
